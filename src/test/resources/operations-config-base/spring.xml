@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:sec="http://www.springframework.org/schema/security"
+	xmlns:task="http://www.springframework.org/schema/task"
+	xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/mvc
+       http://www.springframework.org/schema/mvc/spring-mvc.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx.xsd
+       http://www.springframework.org/schema/security
+       http://www.springframework.org/schema/security/spring-security-4.2.xsd
+       http://www.springframework.org/schema/task
+           http://www.springframework.org/schema/task/spring-task-3.0.xsd">
+
+
+	<context:property-placeholder
+		location="classpath:hibernate.properties" ignore-unresolvable="true"
+		order="1" />
+	<context:property-placeholder
+		location="classpath:Application.properties" ignore-unresolvable="true"
+		order="2" />
+
+	<sec:http auto-config="true">
+		<sec:csrf token-repository-ref="tokenRepository" />
+		<sec:form-login login-page="/index.jsp"
+			username-parameter="ssoId" password-parameter="password"
+			authentication-failure-url="/Access_Denied" />
+		<sec:custom-filter ref="autoLoginFilter"
+			position="PRE_AUTH_FILTER" />
+		<sec:logout logout-url="/logout.do" />
+		<sec:session-management
+			session-fixation-protection="migrateSession"></sec:session-management>
+		<sec:access-denied-handler
+			ref="customAccessDeniedHandler" />
+		<sec:session-management
+			invalid-session-url="/sessionExpiredIndex.jsp"></sec:session-management>
+	</sec:http>
+
+	<bean id="tokenRepository"
+		class="org.springframework.security.web.csrf.CookieCsrfTokenRepository">
+		<property name="cookieHttpOnly" value="false" />
+	</bean>
+
+	<bean id="autoLoginFilter"
+		class="systeam.primula.security.AutoLoginFilter">
+		<property name="authenticationManager"
+			ref="authenticationManager" />
+	</bean>
+
+	<bean id="customAccessDeniedHandler"
+		class="systeam.primula.security.PrimulaAccessDeniedHandler" />
+
+	<bean id="preauthAuthProvider"
+		class="org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationProvider">
+		<property name="preAuthenticatedUserDetailsService">
+			<bean
+				class="systeam.primula.hibernate.SessionAuthenticationUserDetailsService"></bean>
+		</property>
+		<property name="order" value="1" />
+	</bean>
+
+
+	<sec:authentication-manager
+		alias="authenticationManager">
+		<sec:authentication-provider
+			ref="preauthAuthProvider"></sec:authentication-provider>
+	</sec:authentication-manager>
+
+	<sec:global-method-security
+		pre-post-annotations="enabled" />
+
+	<context:component-scan
+		base-package="systeam.primula">
+
+	</context:component-scan>
+
+	<mvc:annotation-driven>
+		<mvc:message-converters>
+			<!-- Use the HibernateAware mapper instead of the default -->
+			<bean
+				class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+				<property name="objectMapper">
+					<bean class="systeam.primula.util.HibernateAwareObjectMapper" />
+				</property>
+			</bean>
+		</mvc:message-converters>
+	</mvc:annotation-driven>
+
+	<task:annotation-driven executor="taskExecutor" />
+
+	<bean id="taskExecutor"
+		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="10" />
+		<property name="maxPoolSize" value="25" />
+		<property name="queueCapacity" value="100" />
+	</bean>
+
+	<tx:annotation-driven
+		transaction-manager="transactionManager" proxy-target-class="true" />
+
+	<bean id="transactionManager"
+		class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+
+
+
+	<bean id="viewResolver1"
+		class="org.springframework.web.servlet.view.XmlViewResolver">
+		<property name="order" value="1" />
+		<property name="location" value="/WEB-INF/views.xml" />
+
+	</bean>
+
+	<bean id="viewResolver2"
+		class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="prefix" value="/WEB-INF/jsp/" />
+		<property name="suffix" value=".jsp" />
+		<property name="order" value="2" />
+	</bean>
+
+
+	<bean id="tilesViewResolver"
+		class="org.springframework.web.servlet.view.UrlBasedViewResolver">
+		<property name="viewClass"
+			value="org.springframework.web.servlet.view.tiles3.TilesView" />
+		<property name="order" value="0" />
+	</bean>
+
+	<bean id="tilesConfigurer"
+		class="org.springframework.web.servlet.view.tiles3.TilesConfigurer">
+		<property name="definitions">
+			<list>
+				<value>/WEB-INF/tiles.xml</value>
+			</list>
+		</property>
+	</bean>
+
+	<bean id="dataSource" class="oracle.jdbc.pool.OracleDataSource"
+		destroy-method="close">
+		<property name="URL" value="${hibernate.connection.url}" />
+		<property name="user"
+			value="${hibernate.connection.username}" />
+		<property name="password"
+			value="${hibernate.connection.password}" />
+		<property name="connectionCachingEnabled" value="true" />
+	</bean>
+
+	<bean id="sessionFactory"
+		class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
+
+		<property name="dataSource" ref="dataSource" />
+
+
+		<property name="packagesToScan">
+			<list>
+				<value>systeam.primula.hibernate</value>
+			</list>
+		</property>
+
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.connection.pool_size">${hibernate.connection.pool_size}</prop>
+				<prop key="hibernate.connection.driver_class">oracle.jdbc.OracleDriver</prop>
+				<prop key="hibernate.show_sql">${hibernate.show_sql}</prop>
+				<prop key="hibernate.cache.ehcache.missing_cache_strategy">create</prop>
+				<prop key="hibernate.allow_update_outside_transaction">true</prop>
+				<prop key="hibernate.enable_lazy_load_no_trans">true</prop>
+				<prop key="hibernate.cache.use_query_cache">true</prop>
+				<prop key="hibernate.generate_statistics">false</prop>
+
+			</props>
+		</property>
+
+	</bean>
+
+	<bean id="messageSource"
+		class="systeam.primula.utils.CustomReloadableResourceBundleMessageSource">
+		<property name="basename" value="classpath:systemmessages" />
+		<property name="cacheSeconds" value="60" />
+		<property name="useCodeAsDefaultMessage" value="true" />
+		<property name="fallbackToSystemLocale" value="false" />
+	</bean>
+
+	<bean id="localeResolver"
+		class="org.springframework.web.servlet.i18n.CookieLocaleResolver">
+
+	</bean>
+
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<mvc:mapping path="/**" />
+			<bean
+				class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor">
+				<property name="paramName" value="lang" />
+			</bean>
+		</mvc:interceptor>
+	</mvc:interceptors>
+
+	<mvc:resources mapping="/**" location="/" />
+
+	<mvc:default-servlet-handler />
+</beans>
