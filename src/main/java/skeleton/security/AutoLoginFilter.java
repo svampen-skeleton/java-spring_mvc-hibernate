@@ -13,7 +13,7 @@ public class AutoLoginFilter extends AbstractPreAuthenticatedProcessingFilter {
 
 	@Override
 	protected Object getPreAuthenticatedPrincipal(HttpServletRequest request) {
-		return "IGNORE";
+		return "admin";
 	}
 
 }
